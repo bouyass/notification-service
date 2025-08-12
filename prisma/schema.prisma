@@ -1,0 +1,85 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tenant {
+  id    String @id @default(uuid())
+  name  String
+  apps  App[]
+}
+
+model App {
+  id        String @id @default(uuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  name      String
+  devices   Device[]
+  topics    Topic[]
+}
+
+model User {
+  id        String @id @default(uuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  externalId String
+  devices   Device[]
+}
+
+model Device {
+  id        String @id @default(uuid())
+  appId     String
+  app       App @relation(fields: [appId], references: [id])
+  userId    String
+  user      User @relation(fields: [userId], references: [id])
+  platform  String
+  provider  String
+  pushToken String
+  lastSeenAt DateTime @default(now())
+  isActive  Boolean  @default(true)
+}
+
+model Topic {
+  id     String @id @default(uuid())
+  appId  String
+  app    App @relation(fields: [appId], references: [id])
+  key    String
+  name   String
+}
+
+model Subscription {
+  id       String @id @default(uuid())
+  topicId  String
+  topic    Topic @relation(fields: [topicId], references: [id])
+  deviceId String
+  device   Device @relation(fields: [deviceId], references: [id])
+}
+
+model Notification {
+  id         String @id @default(uuid())
+  appId      String
+  app        App @relation(fields: [appId], references: [id])
+  title      String
+  body       String
+  data       Json?
+  scheduleAt DateTime?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+}
+
+model Delivery {
+  id              String @id @default(uuid())
+  notificationId  String
+  notification    Notification @relation(fields: [notificationId], references: [id])
+  deviceId        String
+  device          Device @relation(fields: [deviceId], references: [id])
+  status          String
+  attemptCount    Int     @default(0)
+  lastError       String?
+  providerMessageId String?
+  completedAt     DateTime?
+}
