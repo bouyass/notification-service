@@ -1,0 +1,62 @@
+name: CI - Node (Notifications)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      # For prisma generate if you need a DB URL; use a dummy sqlite by default
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'file:./dev.db' }}
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      # If you rely on migrations to compile types, uncomment:
+      # - name: Prisma migrate (dev)
+      #   run: npx prisma migrate deploy
+
+      - name: TypeScript build
+        run: npm run build
+
+      # Optional test step
+      - name: Tests
+        if: hashFiles('**/*.test.*') != ''
+        run: npm test
+
+      - name: Artifact (dist)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  # Optional: Deploy to Render with a deploy hook
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+        run: |
+          curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
