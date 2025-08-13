@@ -5,7 +5,7 @@ import path from "path";
 const prisma = new PrismaClient();
 
 // Load tenants/apps from JSON
-const dataPath = path.join(__dirname, "apps.json");
+const dataPath = path.join(process.cwd(), "prisma", "apps.json");
 const tenantsAndApps = JSON.parse(fs.readFileSync(dataPath, "utf8"));
 
 async function main() {
