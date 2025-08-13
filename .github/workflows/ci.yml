@@ -57,7 +57,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Render deploy hook
-        run: |
-          curl -X POST "$RENDER_DEPLOY_HOOK"
         env:
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          [ -n "$RENDER_DEPLOY_HOOK_URL" ] || { echo "Missing hook"; exit 1; }
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" -X POST -H "Content-Length: 0" "$RENDER_DEPLOY_HOOK_URL")
+          echo "HTTP $HTTP_CODE"
+          cat response.json || true
+          test "$HTTP_CODE" -ge 200 -a "$HTTP_CODE" -lt 300
