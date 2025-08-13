@@ -1,0 +1,14 @@
+[
+  {
+    "tenant": {
+      "name": "Trackify Tenant",
+      "issuer": "https://trackify.example.com",
+      "alg": "HS256",
+      "hsSecret": "super-secret-trackify",
+      "audience": "trackify-users"
+    },
+    "apps": [
+      { "name": "Trackify Mobile" }
+    ]
+  }
+]

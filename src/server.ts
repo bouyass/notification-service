@@ -3,6 +3,7 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import { PrismaClient, Device, Notification } from "@prisma/client";
 import axios from "axios";
 import cron from "node-cron";
+import { auth } from "./middlewares/auth";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -18,26 +19,6 @@ interface DecodedToken extends JwtPayload {
   tenant_id: string;
   app_id: string;
   sub: string;
-}
-
-// Middleware Auth multi-tenant
-function auth(req: AuthRequest, res: Response, next: NextFunction) {
-  try {
-    const token = req?.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "No token" });
-
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET as string
-    ) as DecodedToken;
-
-    req.tenantId = decoded.tenant_id;
-    req.appId = decoded.app_id;
-    req.userId = decoded.sub;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: "Invalid token" });
-  }
 }
 
 // 📌 Enregistrer un device

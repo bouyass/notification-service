@@ -10,8 +10,14 @@ generator client {
 model Tenant {
   id     String @id @default(uuid())
   name   String
+  issuer String @unique
+  alg    String
+  hsSecret  String?
+  jwksUrl   String?
+  audience  String?
   apps   App[]
-  users  User[]       // 👈 opposite side for User.tenant
+  users  User[]  
+
 }
 
 model App {
