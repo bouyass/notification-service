@@ -111,16 +111,21 @@ app.post("/v1/notifications", auth, async (req: AuthRequest, res: Response) => {
 // 📌 Fonction d’envoi via Expo Push
 async function sendPushBatch(
   devices: Device[],
-  payload: { title: string; body: string; data?: Record<string, any> },
+  payload: { title: string; body: string; data?: unknown },
   notificationId: string
 ) {
-  const messages = devices.map((d) => ({
+  const data: Record<string, any> | undefined =
+    payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+      ? (payload.data as Record<string, any>)
+      : undefined;
+
+  const messages = devices.map(d => ({
     to: d.pushToken,
     title: payload.title,
     body: payload.body,
-    data: payload.data,
+    data,
     sound: "default",
-    priority: "high"
+    priority: "high",
   }));
 
   try {
