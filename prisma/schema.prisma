@@ -1,119 +1,78 @@
-datasource db {
+datasource db { 
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url = env("DATABASE_URL")
+  schemas = ["notifications"]
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-model Tenant {
-  id     String @id @default(uuid())
-  name   String
-  issuer String @unique
-  alg    String
-  hsSecret  String?
-  jwksUrl   String?
-  audience  String?
-  apps   App[]
-  users  User[]  
-
-}
-
-model App {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  name      String
-  devices   Device[]
-  topics    Topic[]
-  notifications Notification[]
-  keys  AppKey[]
-}
-
-model AppKey {
-  id         String   @id @default(uuid())
-  appId      String
-  kid        String               
-  alg        String   @default("RS256")
-       
-  publicJwk    Json?
-  privatePkcs8 String?
-
-  secret       String?
-
-  isActive   Boolean  @default(true)
-  notBefore  DateTime?
-  expiresAt  DateTime?
-
-  app        App      @relation(fields: [appId], references: [id])
-  @@unique([appId, kid])
+generator client { 
+  provider = "prisma-client-js" 
 }
 
 model User {
-  id         String  @id @default(uuid())
+  id         String   @id @default(uuid())
   tenantId   String
-  tenant     Tenant  @relation(fields: [tenantId], references: [id])
   externalId String
   devices    Device[]
+  @@index([tenantId, externalId])
+  @@schema("notifications")
 }
 
 model Device {
-  id        String @id @default(uuid())
-  appId     String
-  app       App    @relation(fields: [appId], references: [id])
-  userId    String
-  user      User   @relation(fields: [userId], references: [id])
-  platform  String
-  provider  String
-  pushToken String
+  id         String   @id @default(uuid())
+  appId      String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  platform   String
+  provider   String
+  pushToken  String
   lastSeenAt DateTime @default(now())
-  isActive  Boolean  @default(true)
-
-  subscriptions Subscription[] // 👈 opposite side for Subscription.device
-  deliveries    Delivery[]     // 👈 opposite side for Delivery.device
+  isActive   Boolean  @default(true)
+  subscriptions Subscription[]
+  deliveries    Delivery[]
+  @@schema("notifications")
 }
 
 model Topic {
-  id       String @id @default(uuid())
+  id       String  @id @default(uuid())
   appId    String
-  app      App    @relation(fields: [appId], references: [id])
   key      String
   name     String
-  subscriptions Subscription[] // 👈 opposite side for Subscription.topic
+  subscriptions Subscription[]
+  @@schema("notifications")
 }
 
 model Subscription {
-  id       String @id @default(uuid())
+  id       String  @id @default(uuid())
   topicId  String
-  topic    Topic  @relation(fields: [topicId], references: [id])
+  topic    Topic   @relation(fields: [topicId], references: [id])
   deviceId String
-  device   Device @relation(fields: [deviceId], references: [id])
+  device   Device  @relation(fields: [deviceId], references: [id])
+  @@schema("notifications")
 }
 
 model Notification {
-  id         String @id @default(uuid())
+  id         String   @id @default(uuid())
   appId      String
-  app        App    @relation(fields: [appId], references: [id])
   title      String
   body       String
   data       Json?
   scheduleAt DateTime?
   status     String   @default("pending")
   createdAt  DateTime @default(now())
-
-  deliveries Delivery[] // 👈 opposite side for Delivery.notification
+  deliveries Delivery[]
+  @@schema("notifications")
 }
 
 model Delivery {
-  id               String        @id @default(uuid())
+  id               String   @id @default(uuid())
   notificationId   String
-  notification     Notification  @relation(fields: [notificationId], references: [id])
+  notification     Notification @relation(fields: [notificationId], references: [id])
   deviceId         String
-  device           Device        @relation(fields: [deviceId], references: [id])
+  device           Device   @relation(fields: [deviceId], references: [id])
   status           String
-  attemptCount     Int     @default(0)
+  attemptCount     Int      @default(0)
   lastError        String?
   providerMessageId String?
   completedAt      DateTime?
+  @@schema("notifications")
 }

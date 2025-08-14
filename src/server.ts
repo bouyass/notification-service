@@ -4,6 +4,8 @@ import { PrismaClient, Device, Notification } from "@prisma/client";
 import axios from "axios";
 import cron from "node-cron";
 import { auth } from "./middlewares/auth";
+import swaggerUi from "swagger-ui-express";
+import { openapiSpec } from "./docs/openapi";
 
 const prisma = new PrismaClient();
 const app = express();
@@ -20,6 +22,11 @@ interface DecodedToken extends JwtPayload {
   app_id: string;
   sub: string;
 }
+
+app.get("/v1/health", (_req, res) => res.json({ ok: true }));
+
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));
+app.get("/openapi.json", (_req, res) => res.json(openapiSpec));
 
 // 📌 Enregistrer un device
 app.post("/v1/devices", auth, async (req: AuthRequest, res: Response) => {
