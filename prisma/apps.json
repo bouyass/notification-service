@@ -3,12 +3,12 @@
     "tenant": {
       "name": "Trackify Tenant",
       "issuer": "https://trackify.example.com",
-      "alg": "HS256",
-      "hsSecret": "super-secret-trackify",
-      "audience": "trackify-users"
+      "audience": "trackify-users",
+      "alg": "HS256"
     },
     "apps": [
-      { "name": "Trackify Mobile" }
+      { "name": "Trackify Mobile", "hsSecret": "super-secret-trackify-mobile" },
+      { "name": "Trackify Web", "hsSecret": "super-secret-trackify-web" }
     ]
   }
 ]

@@ -27,7 +27,27 @@ model App {
   name      String
   devices   Device[]
   topics    Topic[]
-  notifications Notification[] // 👈 opposite side for Notification.app
+  notifications Notification[]
+  keys  AppKey[]
+}
+
+model AppKey {
+  id         String   @id @default(uuid())
+  appId      String
+  kid        String               
+  alg        String   @default("RS256")
+       
+  publicJwk    Json?
+  privatePkcs8 String?
+
+  secret       String?
+
+  isActive   Boolean  @default(true)
+  notBefore  DateTime?
+  expiresAt  DateTime?
+
+  app        App      @relation(fields: [appId], references: [id])
+  @@unique([appId, kid])
 }
 
 model User {
