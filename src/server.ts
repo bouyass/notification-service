@@ -1,11 +1,11 @@
 import express, { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
-import { PrismaClient, Device, Notification } from "@prisma/client";
 import axios from "axios";
 import cron from "node-cron";
 import { auth } from "./middlewares/auth";
 import swaggerUi from "swagger-ui-express";
 import { openapiSpec } from "./docs/openapi";
+import { Device, PrismaClient, Notification } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const app = express();
