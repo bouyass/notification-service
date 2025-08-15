@@ -30,17 +30,30 @@ app.get("/openapi.json", (_req, res) => res.json(openapiSpec));
 
 // 📌 Enregistrer un device
 app.post("/v1/devices", auth, async (req: AuthRequest, res: Response) => {
-  const { platform, provider, pushToken } = req.body as {
+  const { platform, provider, pushToken, tenantId, externalUserId } = req.body as {
+    tenantId: string;
+    externalUserId: string;
     platform: string;
     provider: string;
     pushToken: string;
   };
+
+  let user = await prisma.user.findFirst({
+    where: { tenantId, externalId: externalUserId }
+  });
+
+  if (!user) {
+    user = await prisma.user.create({
+      data: { tenantId, externalId: externalUserId }
+    });
+  }
 
   let device = await prisma.device.findFirst({
     where: { pushToken, appId: req.appId }
   });
 
   if (!device) {
+    
     device = await prisma.device.create({
       data: {
         platform,

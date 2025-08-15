@@ -27,7 +27,7 @@ model Device {
   pushToken  String
   lastSeenAt DateTime @default(now())
   isActive   Boolean  @default(true)
-  subscriptions Subscription[]
+  subscriptions NotificationSubscription[]
   deliveries    Delivery[]
   @@schema("notifications")
 }
@@ -37,11 +37,11 @@ model Topic {
   appId    String
   key      String
   name     String
-  subscriptions Subscription[]
+  subscriptions NotificationSubscription[]
   @@schema("notifications")
 }
 
-model Subscription {
+model NotificationSubscription {
   id       String  @id @default(uuid())
   topicId  String
   topic    Topic   @relation(fields: [topicId], references: [id])
