@@ -136,7 +136,7 @@ async function sendPushBatch(
       { headers: { "Content-Type": "application/json" } }
     );
 
-    const tickets = res.data.data;
+    const tickets = (res.data as any).data 
 
     for (let i = 0; i < devices.length; i++) {
       await prisma.delivery.create({
