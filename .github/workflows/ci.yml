@@ -39,10 +39,12 @@ jobs:
       - name: TypeScript build
         run: npm run build
 
-      # Optional test step
-      - name: Tests
-        if: hashFiles('**/*.test.*') != ''
+
+      - name: Run tests
         run: npm test
+        env: 
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FCM_SERVICE_ACCOUNT_FILE: ${{ secrets.FCM_SERVICE_ACCOUNT_FILE }}
 
       - name: Artifact (dist)
         uses: actions/upload-artifact@v4

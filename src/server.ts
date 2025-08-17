@@ -1,177 +1,26 @@
-import express, { Request, Response, NextFunction } from "express";
-import jwt, { JwtPayload } from "jsonwebtoken";
-import axios from "axios";
-import cron from "node-cron";
-import { auth } from "./middlewares/auth";
+import express from "express";
 import swaggerUi from "swagger-ui-express";
 import { openapiSpec } from "./docs/openapi";
-import { Device, PrismaClient, Notification } from "@prisma/client";
 
-const prisma = new PrismaClient();
+import devices from "./routes/devices";
+import topics from "./routes/topics";
+import subscriptions from "./routes/subscriptions";
+import notifications from "./routes/notifications";
+
 const app = express();
 app.use(express.json());
 
-interface AuthRequest extends Request {
-  tenantId?: string;
-  appId?: string;
-  userId?: string;
-}
-
-interface DecodedToken extends JwtPayload {
-  tenant_id: string;
-  app_id: string;
-  sub: string;
-}
-
+// Health
 app.get("/v1/health", (_req, res) => res.json({ ok: true }));
 
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));
-app.get("/openapi.json", (_req, res) => res.json(openapiSpec));
+app.use("/v1/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec))
+app.get("/v1/openapi.json", (_req, res) => res.json(openapiSpec))
 
-// 📌 Enregistrer un device
-app.post("/v1/devices", auth, async (req: AuthRequest, res: Response) => {
-  const { platform, provider, pushToken, tenantId, externalUserId } = req.body as {
-    tenantId: string;
-    externalUserId: string;
-    platform: string;
-    provider: string;
-    pushToken: string;
-  };
+app.use("/v1/devices", devices);
+app.use("/v1/topics", topics);
+app.use("/v1/subscriptions", subscriptions);
+app.use("/v1/notifications", notifications);
 
-  let user = await prisma.user.findFirst({
-    where: { tenantId, externalId: externalUserId }
-  });
-
-  if (!user) {
-    user = await prisma.user.create({
-      data: { tenantId, externalId: externalUserId }
-    });
-  }
-
-  let device = await prisma.device.findFirst({
-    where: { pushToken, appId: req.appId }
-  });
-
-  if (!device) {
-    
-    device = await prisma.device.create({
-      data: {
-        platform,
-        provider,
-        pushToken,
-        appId: req.appId!,
-        userId: req.userId!
-      }
-    });
-  } else {
-    device = await prisma.device.update({
-      where: { id: device.id },
-      data: { lastSeenAt: new Date(), isActive: true }
-    });
-  }
-
-  res.json(device);
+export const server = app.listen(3000, () => {
+  console.log("🚀 Notification service running on :3000");
 });
-
-// 📌 Envoyer une notif immédiate
-app.post("/v1/notifications", auth, async (req: AuthRequest, res: Response) => {
-  const { userIds, title, body, data, scheduleAt } = req.body as {
-    userIds?: string[];
-    title: string;
-    body: string;
-    data?: Record<string, any>;
-    scheduleAt?: string;
-  };
-
-  const devices = await prisma.device.findMany({
-    where: {
-      appId: req.appId,
-      isActive: true,
-      ...(userIds ? { userId: { in: userIds } } : {})
-    }
-  });
-
-  const notif = await prisma.notification.create({
-    data: {
-      appId: req.appId!,
-      title,
-      body,
-      data,
-      scheduleAt: scheduleAt ? new Date(scheduleAt) : null,
-      status: scheduleAt ? "pending" : "sent"
-    }
-  });
-
-  // Si programmation → laisser le cron job s'en charger
-  if (scheduleAt) return res.json({ status: "scheduled" });
-
-  await sendPushBatch(devices, { title, body, data }, notif.id);
-  res.json({ status: "sent" });
-});
-
-// 📌 Fonction d’envoi via Expo Push
-async function sendPushBatch(
-  devices: Device[],
-  payload: { title: string; body: string; data?: unknown },
-  notificationId: string
-) {
-  const data: Record<string, any> | undefined =
-    payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)
-      ? (payload.data as Record<string, any>)
-      : undefined;
-
-  const messages = devices.map(d => ({
-    to: d.pushToken,
-    title: payload.title,
-    body: payload.body,
-    data,
-    sound: "default",
-    priority: "high",
-  }));
-
-  try {
-    const res = await axios.post(
-      "https://exp.host/--/api/v2/push/send",
-      messages,
-      { headers: { "Content-Type": "application/json" } }
-    );
-
-    const tickets = (res.data as any).data 
-
-    for (let i = 0; i < devices.length; i++) {
-      await prisma.delivery.create({
-        data: {
-          notificationId,
-          deviceId: devices[i].id,
-          status: tickets[i]?.status || "error",
-          providerMessageId: tickets[i]?.id || null
-        }
-      });
-    }
-  } catch (err: any) {
-    console.error("Push send error", err.response?.data || err.message);
-  }
-}
-
-// ⏰ Cron pour envois programmés
-cron.schedule("* * * * *", async () => {
-  const now = new Date();
-  const notifs: Notification[] = await prisma.notification.findMany({
-    where: { scheduleAt: { lte: now }, status: "pending" }
-  });
-
-  for (const notif of notifs) {
-    const devices = await prisma.device.findMany({
-      where: { appId: notif.appId, isActive: true }
-    });
-    await sendPushBatch(devices, notif, notif.id);
-    await prisma.notification.update({
-      where: { id: notif.id },
-      data: { status: "sent" }
-    });
-  }
-});
-
-app.listen(3000, () =>
-  console.log("🚀 Notification service running on :3000")
-);

@@ -6,7 +6,7 @@ const ISSUER_BASE_URL = process.env.ISSUER_BASE_URL;
 // cache JWKS par appId
 const jwksByApp = new Map<string, ReturnType<typeof createRemoteJWKSet>>(); 
 
-type AuthedRequest = Request & {
+export type AuthRequest = Request & {
     tenantId?: string;
     appId?: string;
     userId?: string;
@@ -14,9 +14,16 @@ type AuthedRequest = Request & {
 };
 
 
-export const auth = async (req: AuthedRequest, res: Response, next: NextFunction) => {
+export const auth = async (req: AuthRequest, res: Response, next: NextFunction) => {
 
     try {
+
+        if (process.env.NODE_ENV === "test") {
+            req.tenantId = "t1";
+            req.appId = "app_a";
+            req.userId = "user_test";
+            return next();
+        }
 
         // récupérer le token
         const raw = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");

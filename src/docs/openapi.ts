@@ -1,117 +1,182 @@
-// src/docs/openapi.ts
 export const openapiSpec = {
   openapi: "3.0.3",
   info: {
-    title: "Notifications Service API",
+    title: "Notification Service API",
     version: "1.0.0",
-    description:
-      "API to register push devices and send notifications (immediate or scheduled). Secured with JWTs signed by the Issuer service."
+    description: "Manage devices, topics, subscriptions and notifications"
   },
-  servers: [{ url: "http://localhost:3000" }],
-  tags: [
-    { name: "Devices", description: "Manage push devices" },
-    { name: "Notifications", description: "Send notifications" }
+  servers: [
+    { url: process.env.PUBLIC_BASE_URL || "http://localhost:3000" }
   ],
-  security: [{ BearerAuth: [] }],
   paths: {
+    // ---------------- HEALTH ----------------
+    "/v1/health": {
+      get: {
+        summary: "Healthcheck",
+        responses: { "200": { description: "OK" } }
+      }
+    },
+
+    // ---------------- DEVICES ----------------
     "/v1/devices": {
       post: {
         tags: ["Devices"],
         summary: "Register or update a device",
-        operationId: "registerDevice",
         security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
           content: {
             "application/json": {
-              schema: { $ref: "#/components/schemas/RegisterDeviceRequest" },
-              examples: {
-                expo_ios: {
-                  value: {
-                    platform: "ios",
-                    provider: "expo",
-                    pushToken: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
-                  }
-                }
-              }
+              schema: { $ref: "#/components/schemas/DeviceInput" }
             }
           }
         },
         responses: {
-          "200": {
-            description: "Device created or updated",
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/Device" }
-              }
-            }
-          },
-          "400": { $ref: "#/components/responses/BadRequest" },
-          "401": { $ref: "#/components/responses/Unauthorized" },
-          "500": { $ref: "#/components/responses/ServerError" }
+          201: {
+            description: "Device registered",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Device" } } }
+          }
+        }
+      },
+      get: {
+        tags: ["Devices"],
+        summary: "List devices",
+        security: [{ BearerAuth: [] }],
+        parameters: [
+          { name: "platform", in: "query", schema: { type: "string" } },
+          { name: "externalUserId", in: "query", schema: { type: "string" } }
+        ],
+        responses: {
+          200: { description: "List of devices", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Device" } } } } }
         }
       }
     },
+    "/v1/devices/{id}": {
+      delete: {
+        tags: ["Devices"],
+        summary: "Delete a device (also deletes user if no other devices remain)",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 204: { description: "Device deleted" } }
+      }
+    },
+
+    // ---------------- TOPICS ----------------
+    "/v1/topics": {
+      post: {
+        tags: ["Topics"],
+        summary: "Create a topic",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/TopicInput" } } }
+        },
+        responses: {
+          201: { description: "Topic created", content: { "application/json": { schema: { $ref: "#/components/schemas/Topic" } } } }
+        }
+      },
+      get: {
+        tags: ["Topics"],
+        summary: "List topics",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: { description: "List of topics", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Topic" } } } } }
+        }
+      }
+    },
+    "/v1/topics/{id}": {
+      delete: {
+        tags: ["Topics"],
+        summary: "Delete topic (cascades subscriptions + notifications)",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 204: { description: "Topic deleted" } }
+      }
+    },
+
+    // ---------------- SUBSCRIPTIONS ----------------
+    "/v1/subscriptions/{topicId}/subscribe": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Subscribe a user (all devices) to a topic",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/UserSubscriptionInput" } } }
+        },
+        responses: {
+          201: { description: "User subscribed", content: { "application/json": { schema: { type: "object", properties: { subscribedDevices: { type: "integer" } } } } } }
+        }
+      }
+    },
+    "/v1/subscriptions/{topicId}/unsubscribe": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Unsubscribe a user (all devices) from a topic",
+        security: [{ BearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/UserSubscriptionInput" } } }
+        },
+        responses: {
+          200: { description: "User unsubscribed", content: { "application/json": { schema: { type: "object", properties: { unsubscribedDevices: { type: "integer" } } } } } }
+        }
+      }
+    },
+    "/v1/subscriptions/{id}": {
+      delete: {
+        tags: ["Subscriptions"],
+        summary: "Delete a single subscription (admin/debug)",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 204: { description: "Subscription deleted" } }
+      }
+    },
+
+    // ---------------- NOTIFICATIONS ----------------
     "/v1/notifications": {
       post: {
         tags: ["Notifications"],
-        summary: "Send a notification now or schedule it",
-        operationId: "sendNotification",
+        summary: "Send or schedule a notification",
         security: [{ BearerAuth: [] }],
         requestBody: {
           required: true,
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/SendNotificationRequest" },
-              examples: {
-                immediate_to_users: {
-                  value: {
-                    userIds: ["user_123", "user_987"],
-                    title: "Welcome",
-                    body: "Thanks for joining!",
-                    data: { screen: "home" }
-                  }
-                },
-                scheduled_broadcast: {
-                  value: {
-                    title: "Promo",
-                    body: "-20% this weekend",
-                    scheduleAt: "2025-08-16T10:00:00Z"
-                  }
-                }
-              }
-            }
-          }
+          content: { "application/json": { schema: { $ref: "#/components/schemas/NotificationInput" } } }
         },
         responses: {
-          "200": {
-            description: "Dispatch result",
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/NotificationDispatchResponse" },
-                examples: {
-                  scheduled: { value: { status: "scheduled" } },
-                  sent: { value: { status: "sent" } }
-                }
-              }
-            }
-          },
-          "400": { $ref: "#/components/responses/BadRequest" },
-          "401": { $ref: "#/components/responses/Unauthorized" },
-          "500": { $ref: "#/components/responses/ServerError" }
+          201: {
+            description: "Notification created",
+            content: { "application/json": { schema: { type: "object", properties: { id: { type: "string" }, status: { type: "string" } } } } }
+          }
+        }
+      },
+      get: {
+        tags: ["Notifications"],
+        summary: "List notifications",
+        security: [{ BearerAuth: [] }],
+        responses: {
+          200: { description: "List of notifications", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Notification" } } } } }
         }
       }
     },
-    "/openapi.json": {
+    "/v1/notifications/{id}": {
       get: {
-        summary: "OpenAPI document",
-        responses: { "200": { description: "OpenAPI JSON" } }
+        tags: ["Notifications"],
+        summary: "Get a notification with deliveries",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          200: { description: "Notification details", content: { "application/json": { schema: { $ref: "#/components/schemas/NotificationWithDeliveries" } } } }
+        }
       }
     },
-    "/docs": {
-      get: {
-        summary: "Swagger UI",
-        responses: { "200": { description: "Swagger UI HTML" } }
+    "/v1/notifications/{id}/cancel": {
+      post: {
+        tags: ["Notifications"],
+        summary: "Cancel a scheduled notification",
+        security: [{ BearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { 200: { description: "Notification cancelled" } }
       }
     }
   },
@@ -119,92 +184,103 @@ export const openapiSpec = {
     securitySchemes: {
       BearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" }
     },
-    responses: {
-      BadRequest: {
-        description: "Invalid input",
-        content: {
-          "application/json": {
-            schema: { $ref: "#/components/schemas/ErrorResponse" },
-            examples: { bad_request: { value: { error: "bad_request", message: "Invalid payload" } } }
-          }
-        }
-      },
-      Unauthorized: {
-        description: "Missing or invalid JWT",
-        content: {
-          "application/json": {
-            schema: { $ref: "#/components/schemas/ErrorResponse" },
-            examples: { unauthorized: { value: { error: "missing_token" } } }
-          }
-        }
-      },
-      ServerError: {
-        description: "Unexpected server error",
-        content: {
-          "application/json": {
-            schema: { $ref: "#/components/schemas/ErrorResponse" },
-            examples: { server_error: { value: { error: "server_error" } } }
-          }
-        }
-      }
-    },
     schemas: {
-      RegisterDeviceRequest: {
-        type: "object",
-        properties: {
-          platform: { type: "string", example: "ios", description: "Client platform (ios|android|web...)" },
-          provider: { type: "string", example: "expo", description: "Push provider (expo, fcm...)" },
-          pushToken: { type: "string", description: "Push token from the provider" }
-        },
-        required: ["platform", "provider", "pushToken"]
-      },
       Device: {
         type: "object",
         properties: {
-          id: { type: "string", format: "uuid" },
+          id: { type: "string" },
           appId: { type: "string" },
           userId: { type: "string" },
           platform: { type: "string" },
           provider: { type: "string" },
           pushToken: { type: "string" },
-          lastSeenAt: { type: "string", format: "date-time" },
-          isActive: { type: "boolean" }
-        },
-        required: ["id", "appId", "userId", "platform", "provider", "pushToken", "lastSeenAt", "isActive"]
+          isActive: { type: "boolean" },
+          lastSeenAt: { type: "string", format: "date-time" }
+        }
       },
-      SendNotificationRequest: {
+      DeviceInput: {
         type: "object",
         properties: {
-          userIds: {
-            type: "array",
-            items: { type: "string" },
-            description: "Target specific users (optional). If omitted, all active devices for appId are targeted."
-          },
+          externalUserId: { type: "string" },
+          platform: { type: "string" },
+          provider: { type: "string" },
+          pushToken: { type: "string" }
+        },
+        required: ["externalUserId", "platform", "provider", "pushToken"]
+      },
+      Topic: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          appId: { type: "string" },
+          key: { type: "string" },
+          name: { type: "string" }
+        }
+      },
+      TopicInput: {
+        type: "object",
+        properties: { key: { type: "string" }, name: { type: "string" } },
+        required: ["key", "name"]
+      },
+      Subscription: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          topicId: { type: "string" },
+          deviceId: { type: "string" }
+        }
+      },
+      UserSubscriptionInput: {
+        type: "object",
+        properties: { externalUserId: { type: "string" } },
+        required: ["externalUserId"]
+      },
+      Notification: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          appId: { type: "string" },
+          topicId: { type: "string" },
           title: { type: "string" },
           body: { type: "string" },
           data: { type: "object", additionalProperties: true },
-          scheduleAt: {
-            type: "string",
-            format: "date-time",
-            description: "ISO date-time to schedule; if omitted, sends immediately."
-          }
+          scheduleAt: { type: "string", format: "date-time" },
+          status: { type: "string" },
+          createdAt: { type: "string", format: "date-time" }
+        }
+      },
+      NotificationInput: {
+        type: "object",
+        properties: {
+          userIds: { type: "array", items: { type: "string" } },
+          topicId: { type: "string" },
+          title: { type: "string" },
+          body: { type: "string" },
+          data: { type: "object", additionalProperties: true },
+          scheduleAt: { type: "string", format: "date-time" }
         },
         required: ["title", "body"]
       },
-      NotificationDispatchResponse: {
-        type: "object",
+      NotificationWithDeliveries: {
+        allOf: [{ $ref: "#/components/schemas/Notification" }],
         properties: {
-          status: { type: "string", enum: ["scheduled", "sent"] }
-        },
-        required: ["status"]
-      },
-      ErrorResponse: {
-        type: "object",
-        properties: {
-          error: { type: "string" },
-          message: { type: "string" }
-        },
-        required: ["error"]
+          deliveries: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                notificationId: { type: "string" },
+                deviceId: { type: "string" },
+                status: { type: "string" },
+                attemptCount: { type: "integer" },
+                lastError: { type: "string" },
+                providerMessageId: { type: "string" },
+                completedAt: { type: "string", format: "date-time" }
+              }
+            }
+          }
+        }
       }
     }
   }

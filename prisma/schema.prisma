@@ -1,7 +1,7 @@
 datasource db { 
   provider = "postgresql"
-  url = env("DATABASE_URL")
-  schemas = ["notifications"]
+  url      = env("DATABASE_URL")
+  schemas  = ["notifications"]
 }
 
 generator client { 
@@ -10,10 +10,13 @@ generator client {
 
 model User {
   id         String   @id @default(uuid())
-  tenantId   String
-  externalId String
-  devices    Device[]
-  @@index([tenantId, externalId])
+  appId      String   // link user directly to an App
+  externalId String   // ID from the business system (Trackify user ID)
+
+  devices       Device[]
+  subscriptions NotificationSubscription[]  // 👈 user subscribes to topics
+
+  @@index([appId, externalId])
   @@schema("notifications")
 }
 
@@ -22,44 +25,63 @@ model Device {
   appId      String
   userId     String
   user       User     @relation(fields: [userId], references: [id])
-  platform   String
-  provider   String
+
+  platform   String   // ios | android | web
+  provider   String   // fcm | apns
   pushToken  String
   lastSeenAt DateTime @default(now())
   isActive   Boolean  @default(true)
-  subscriptions NotificationSubscription[]
-  deliveries    Delivery[]
+
+  deliveries Delivery[]
+
+  @@index([appId, pushToken])
   @@schema("notifications")
 }
 
 model Topic {
-  id       String  @id @default(uuid())
-  appId    String
-  key      String
-  name     String
+  id            String   @id @default(uuid())
+  appId         String
+  key           String   // stable key (e.g. "artist-drake")
+  name          String   // human-friendly name
+
   subscriptions NotificationSubscription[]
+  notifications Notification[]
+
+  @@unique([appId, key])
   @@schema("notifications")
 }
 
 model NotificationSubscription {
-  id       String  @id @default(uuid())
+  id       String @id @default(uuid())
   topicId  String
-  topic    Topic   @relation(fields: [topicId], references: [id])
-  deviceId String
-  device   Device  @relation(fields: [deviceId], references: [id])
+  topic    Topic  @relation(fields: [topicId], references: [id])
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([topicId, userId])
   @@schema("notifications")
 }
 
 model Notification {
   id         String   @id @default(uuid())
   appId      String
+
+  // can be targeted to a topic OR directly to a user
+  topicId    String?  
+  topic      Topic?   @relation(fields: [topicId], references: [id])
+
   title      String
   body       String
   data       Json?
   scheduleAt DateTime?
-  status     String   @default("pending")
+  status     String   @default("pending")  // pending | sent | failed
   createdAt  DateTime @default(now())
+
   deliveries Delivery[]
+
   @@schema("notifications")
 }
 
@@ -67,12 +89,16 @@ model Delivery {
   id               String   @id @default(uuid())
   notificationId   String
   notification     Notification @relation(fields: [notificationId], references: [id])
+
   deviceId         String
   device           Device   @relation(fields: [deviceId], references: [id])
-  status           String
+
+  status           String                // pending | success | failed
   attemptCount     Int      @default(0)
   lastError        String?
   providerMessageId String?
   completedAt      DateTime?
+
+  @@index([deviceId])
   @@schema("notifications")
 }
