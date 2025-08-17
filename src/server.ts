@@ -6,15 +6,16 @@ import devices from "./routes/devices";
 import topics from "./routes/topics";
 import subscriptions from "./routes/subscriptions";
 import notifications from "./routes/notifications";
+import { Request, Response } from "express";
 
 const app = express();
 app.use(express.json());
 
 // Health
-app.get("/v1/health", (_req, res) => res.json({ ok: true }));
+app.get("/v1/health", (_req: Request, res: Response) => res.json({ ok: true }));
 
 app.use("/v1/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec))
-app.get("/v1/openapi.json", (_req, res) => res.json(openapiSpec))
+app.get("/v1/openapi.json", (_req: Request, res: Response) => res.json(openapiSpec))
 
 app.use("/v1/devices", devices);
 app.use("/v1/topics", topics);
