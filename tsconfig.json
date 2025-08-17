@@ -7,8 +7,11 @@
     "rootDir": ".",
     "outDir": "dist",
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts", "**/tests/**/*.ts"]
+  "include": ["src/**/*", "prisma/**/*"]  
 }
